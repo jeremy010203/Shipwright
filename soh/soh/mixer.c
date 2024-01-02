@@ -292,8 +292,8 @@ void aEnvMixerImpl(uint16_t in_addr, uint16_t n_samples, bool swap_reverb,
                 samples[j] = (samples[j] * vols[j] >> 16) ^ negs[j];
             }
         	for (int j = 0; j < 2; j++) {
-                *dry[j] = clamp16(*dry[j] + samples[j]); dry[j]++;
-                *wet[j] = clamp16(*wet[j] + ((samples[swapped[j]] * vol_wet >> 16) ^ negs[2 + j])); wet[j]++;
+                *dry[j] = *dry[j] + samples[j]; dry[j]++;
+                *wet[j] = *wet[j] + ((samples[swapped[j]] * vol_wet >> 16) ^ negs[2 + j]); wet[j]++;
             }
         }
         vols[0] += rates[0];
