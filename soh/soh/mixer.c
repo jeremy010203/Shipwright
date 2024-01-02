@@ -79,7 +79,8 @@ static int16_t resample_table[64][4] = {
 static inline int16_t clamp16(int32_t v) {
     if (v < -0x8000) {
         return -0x8000;
-    } else if (v > 0x7fff) {
+    }
+    if (v > 0x7fff) {
         return 0x7fff;
     }
     return (int16_t)v;
@@ -88,7 +89,8 @@ static inline int16_t clamp16(int32_t v) {
 static inline int32_t clamp32(int64_t v) {
     if (v < -0x7fffffff - 1) {
         return -0x7fffffff - 1;
-    } else if (v > 0x7fffffff) {
+    }
+    if (v > 0x7fffffff) {
         return 0x7fffffff;
     }
     return (int32_t)v;
