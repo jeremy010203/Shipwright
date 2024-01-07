@@ -585,14 +585,14 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
             memcpy(tmp2, state_or_filter + 8, 8 * sizeof(int16_t));
         }
 
-        // Invert filter to optimize computation
         for (int i = 0; i < 8; i++) {
-            rspa.filter[7-i] = (tmp2[i] + rspa.filter[i]) / 2;
+            rspa.filter[i] = (tmp2[i] + rspa.filter[i]) / 2;
         }
 
+        // Transform 32 bits and inverse
         int32_t filterbuf_v[8];
         for (int i = 0; i < 8; i++){
-            filterbuf_v[i] = rspa.filter[i];
+            filterbuf_v[i] = rspa.filter[7 - i];
         }
         do {
             memcpy(tmp + 8, buf, 8 * sizeof(int16_t));
@@ -619,11 +619,6 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
             buf += 8;
             count -= 8 * sizeof(int16_t);
         } while (count > 0);
-
-        // Restore filter
-        for (int i = 0; i < 8; i++) {
-            rspa.filter[i] = rspa.filter[7-i];
-        }
 
         memcpy(state_or_filter, tmp, 8 * sizeof(int16_t));
         memcpy(state_or_filter + 8, rspa.filter, 8 * sizeof(int16_t));
