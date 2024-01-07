@@ -561,6 +561,7 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
 }
 #else
 void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter) {
+    // TODO: check jump high sound incorrect
     if (flags > A_INIT) {
         rspa.filter_count = ROUND_UP_16(count_or_buf);
         memcpy(rspa.filter, state_or_filter, sizeof(rspa.filter));
