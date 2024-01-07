@@ -604,7 +604,7 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
             }
             for (int i = 0; i < 8; i++) {
                 int64_t sample = 0x4000; // round term
-                for (int j = 0; j < 2; j++){
+                for (int j = 0; j < 2; j++) {
                     const __m128i tmp_v = _mm_load_si128((__m128i*)&buf_v[i+j*4]);
                     const __m128i filter_v = _mm_load_si128((__m128i*)&filterbuf_v[j*4]);
                     _mm_store_si128(res, _mm_mullo_epi32(tmp_v, filter_v));
