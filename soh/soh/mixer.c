@@ -208,7 +208,7 @@ void aADPCMdecImpl(uint8_t flags, ADPCM_STATE state) {
                     acc += tbl[1][((j - k) - 1)] * ins[k];
                 }
                 acc >>= 11;
-                *out++ = acc;
+                *out++ = clamp16(acc);
             }
         }
         nbytes -= 16 * sizeof(int16_t);
