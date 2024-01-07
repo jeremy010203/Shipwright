@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "mixer.h"
 
@@ -207,7 +208,7 @@ void aADPCMdecImpl(uint8_t flags, ADPCM_STATE state) {
                     acc += tbl[1][((j - k) - 1)] * ins[k];
                 }
                 acc >>= 11;
-                *out++ = clamp16(acc);
+                *out++ = acc;
             }
         }
         nbytes -= 16 * sizeof(int16_t);
@@ -511,10 +512,13 @@ void aInterlImpl(uint16_t in_addr, uint16_t out_addr, uint16_t n_samples) {
 }
 
 void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter) {
+    
     if (flags > A_INIT) {
         rspa.filter_count = ROUND_UP_16(count_or_buf);
         memcpy(rspa.filter, state_or_filter, sizeof(rspa.filter));
     } else {
+        //printf("state:  %d %d %d %d %d %d %d %d\n", state_or_filter[0], state_or_filter[1], state_or_filter[2], state_or_filter[3], state_or_filter[4], state_or_filter[5], state_or_filter[6], state_or_filter[7]);
+        //printf("filter: %d %d %d %d %d %d %d %d\n", state_or_filter[8], state_or_filter[9], state_or_filter[10], state_or_filter[11], state_or_filter[12], state_or_filter[13], state_or_filter[14], state_or_filter[15]);
         int16_t tmp[16], tmp2[8];
         int count = rspa.filter_count;
         int16_t *buf = BUF_S16(count_or_buf);
@@ -535,15 +539,30 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
         }
 
         for (int i = 0; i < 8; i++) {
-            rspa.filter[i] = (tmp2[i] + rspa.filter[i]) / 2;
+            rspa.filter[7-i] = (tmp2[i] + rspa.filter[i]) / 2;
         }
 
+        int32_t filterbuf_v[8];
+        for (int i = 0; i < 8; i++){
+            filterbuf_v[i] = rspa.filter[i];
+        }
         do {
             memcpy(tmp + 8, buf, 8 * sizeof(int16_t));
+
+            int32_t buf_v[16];
+            int32_t res[4];
+            for (int i = 0; i < 16; i++){
+                buf_v[i] = tmp[i];
+            }
             for (int i = 0; i < 8; i++) {
                 int64_t sample = 0x4000; // round term
-                for (int j = 0; j < 8; j++) {
-                    sample += tmp[i + j] * rspa.filter[7 - j];
+                for (int j = 0; j < 2; j++){
+                    const __m128i tmp_v = _mm_load_si128((__m128i*)&buf_v[i+j*4]);
+                    const __m128i filter_v = _mm_load_si128((__m128i*)&filterbuf_v[j*4]);
+                    _mm_store_si128(res, _mm_mullo_epi32(tmp_v, filter_v));
+                    for (int k = 0; k < 4; k++) {
+                        sample += res[k];
+                    }
                 }
                 buf[i] = clamp16((int32_t)(sample >> 15));
             }
@@ -553,8 +572,14 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
             count -= 8 * sizeof(int16_t);
         } while (count > 0);
 
+        for (int i = 0; i < 8; i++) {
+            rspa.filter[i] = rspa.filter[7-i];
+        }
+
         memcpy(state_or_filter, tmp, 8 * sizeof(int16_t));
         memcpy(state_or_filter + 8, rspa.filter, 8 * sizeof(int16_t));
+        //printf("res state:  %d %d %d %d %d %d %d %d\n------\n", state_or_filter[0], state_or_filter[1], state_or_filter[2], state_or_filter[3], state_or_filter[4], state_or_filter[5], state_or_filter[6], state_or_filter[7]);
+    
     }
 }
 
