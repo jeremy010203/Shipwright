@@ -511,14 +511,12 @@ void aInterlImpl(uint16_t in_addr, uint16_t out_addr, uint16_t n_samples) {
     } while (n > 0);
 }
 
+#ifndef SSE2_AVAILABLE
 void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter) {
-    
     if (flags > A_INIT) {
         rspa.filter_count = ROUND_UP_16(count_or_buf);
         memcpy(rspa.filter, state_or_filter, sizeof(rspa.filter));
     } else {
-        //printf("state:  %d %d %d %d %d %d %d %d\n", state_or_filter[0], state_or_filter[1], state_or_filter[2], state_or_filter[3], state_or_filter[4], state_or_filter[5], state_or_filter[6], state_or_filter[7]);
-        //printf("filter: %d %d %d %d %d %d %d %d\n", state_or_filter[8], state_or_filter[9], state_or_filter[10], state_or_filter[11], state_or_filter[12], state_or_filter[13], state_or_filter[14], state_or_filter[15]);
         int16_t tmp[16], tmp2[8];
         int count = rspa.filter_count;
         int16_t *buf = BUF_S16(count_or_buf);
@@ -538,6 +536,55 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
             memcpy(tmp2, state_or_filter + 8, 8 * sizeof(int16_t));
         }
 
+        for (int i = 0; i < 8; i++) {
+            rspa.filter[i] = (tmp2[i] + rspa.filter[i]) / 2;
+        }
+
+        do {
+            memcpy(tmp + 8, buf, 8 * sizeof(int16_t));
+            for (int i = 0; i < 8; i++) {
+                int64_t sample = 0x4000; // round term
+                for (int j = 0; j < 8; j++) {
+                    sample += tmp[i + j] * rspa.filter[7 - j];
+                }
+                buf[i] = clamp16((int32_t)(sample >> 15));
+            }
+            memcpy(tmp, tmp + 8, 8 * sizeof(int16_t));
+
+            buf += 8;
+            count -= 8 * sizeof(int16_t);
+        } while (count > 0);
+
+        memcpy(state_or_filter, tmp, 8 * sizeof(int16_t));
+        memcpy(state_or_filter + 8, rspa.filter, 8 * sizeof(int16_t));
+    }
+}
+#else
+void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter) {
+    if (flags > A_INIT) {
+        rspa.filter_count = ROUND_UP_16(count_or_buf);
+        memcpy(rspa.filter, state_or_filter, sizeof(rspa.filter));
+    } else {
+        int16_t tmp[16], tmp2[8];
+        int count = rspa.filter_count;
+        int16_t *buf = BUF_S16(count_or_buf);
+
+        if (flags == A_INIT) {
+#ifndef __clang__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmemset-elt-size"
+#endif
+            memset(tmp, 0, 8 * sizeof(int16_t));
+#ifndef __clang__
+#pragma GCC diagnostic pop
+#endif
+            memset(tmp2, 0, 8 * sizeof(int16_t));
+        } else {
+            memcpy(tmp, state_or_filter, 8 * sizeof(int16_t));
+            memcpy(tmp2, state_or_filter + 8, 8 * sizeof(int16_t));
+        }
+
+        // Invert filter to optimize computation
         for (int i = 0; i < 8; i++) {
             rspa.filter[7-i] = (tmp2[i] + rspa.filter[i]) / 2;
         }
@@ -572,16 +619,16 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t *state_or_filter)
             count -= 8 * sizeof(int16_t);
         } while (count > 0);
 
+        // Restore filter
         for (int i = 0; i < 8; i++) {
             rspa.filter[i] = rspa.filter[7-i];
         }
 
         memcpy(state_or_filter, tmp, 8 * sizeof(int16_t));
         memcpy(state_or_filter + 8, rspa.filter, 8 * sizeof(int16_t));
-        //printf("res state:  %d %d %d %d %d %d %d %d\n------\n", state_or_filter[0], state_or_filter[1], state_or_filter[2], state_or_filter[3], state_or_filter[4], state_or_filter[5], state_or_filter[6], state_or_filter[7]);
-    
     }
 }
+#endif
 
 void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
     int16_t *samples = BUF_S16(addr);
